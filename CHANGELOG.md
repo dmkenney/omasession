@@ -6,6 +6,13 @@ request.
 
 ## Unreleased
 
+- A save with fewer windows than the saved session is held until the next
+  save, one timer tick later, still finds fewer. Omarchy's logout closes every
+  window and then ends the session; a tick in between saved the one or two
+  windows still closing over the real session. Logout never reaches the
+  second save, so the session survives; windows really closed are saved a
+  tick later. Off with `confirmShrink false`.
+
 - Every browser profile that had a window comes back, not only Default. The
   save records the browser's open profiles (Local State
   `last_active_profiles`); restore marks each as cleanly closed and launches

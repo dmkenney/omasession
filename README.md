@@ -193,6 +193,7 @@ $OMASESSION config set browserRepairChrome true # include Chrome in automatic re
 $OMASESSION config set appRestoreGhostty true  # include Ghostty on login restore
 $OMASESSION config set restoreOrder true       # reopen windows in their saved slot order
 $OMASESSION config set terminalPrograms "nvim,btop" # relaunch these inside their terminal
+$OMASESSION config set confirmShrink true      # hold a smaller save until the next tick agrees
 ```
 
 The panel's **Google Chrome** action runs `restore-app google-chrome`, asking
