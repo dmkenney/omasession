@@ -170,6 +170,7 @@ DEFAULT_BROWSER_RESTORE=true
 DEFAULT_BROWSER_REPAIR=true
 DEFAULT_BROWSER_REPAIR_CHROME=true
 DEFAULT_APP_RESTORE_GHOSTTY=true
+DEFAULT_RESTORE_ORDER=true
 
 config_get() { # config_get <key> <default> [raw_json]
     # $3, quando dado, poupa uma leitura de config.json que quem chama já fez
@@ -285,9 +286,12 @@ cmd_restore() {
     if [[ "$(config_get browserRestore "$DEFAULT_BROWSER_RESTORE")" == "false" ]]; then
         err "browserRestore=false ainda nao e respeitado; os browsers vao reabrir suas janelas"
     fi
-    local restore_ghostty
+    local restore_ghostty restore_order
     restore_ghostty="$(config_get appRestoreGhostty "$DEFAULT_APP_RESTORE_GHOSTTY")"
+    # restoreOrder: put windows back in their saved slot order (replay.py).
+    restore_order="$(config_get restoreOrder "$DEFAULT_RESTORE_ORDER")"
     OMASESSION_APP_RESTORE_GHOSTTY="$restore_ghostty" \
+    OMASESSION_RESTORE_ORDER="$restore_order" \
         exec python3 "$LIB/replay.py" "$SESSION_DIR/$name.toml"
 }
 

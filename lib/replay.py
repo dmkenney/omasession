@@ -47,6 +47,16 @@ BROWSER_TIMEOUT = 40.0
 BROWSER_QUIET = 10.0    # allow slower profiles to finish native session restore
 SETTLE = 0.4
 
+# Ordered restore. A layout that places windows by the order they arrive -- a
+# Hyprland Lua layout (hl.layout.register), master -- cannot be rebuilt from
+# saved rectangles the way restore_tiled rebuilds dwindle. What it needs is the
+# right arrival order. So while restoring, every window is parked on a hidden
+# special workspace instead of placed, and once all are open they move to their
+# real workspaces one by one in saved slot order (the `order` field written by
+# capture.py). Off with restoreOrder=false.
+STAGING_WORKSPACE = "special:omasession-restore"
+_staged: list[tuple[str, dict, bool]] | None = None
+
 # hl.dsp.window.fullscreen_state takes a mode, not a flag. Hyprland efb50993,
 # src/managers/fullscreen/FullscreenController.hpp:12-15.
 FS_NONE, FS_MAXIMIZED, FULLSCREEN = 0, 1, 2
@@ -208,6 +218,9 @@ def find_new(known: set[str], timeout: float, app: str | None = None):
 
 def place(addr: str, spec: dict) -> None:
     """Put an already-mapped window where the session file says it belongs."""
+    if _staged is not None:
+        stage(addr, spec, browser=False)
+        return
     sel = f"address:{addr}"
     ws = spec.get("workspace")
     if ws is not None:
@@ -243,6 +256,35 @@ def place(addr: str, spec: dict) -> None:
         # applied under a different meaning than the one they were measured in.
         dispatch("window.move", window=sel, x=pos[0], y=pos[1], exact=True)
         time.sleep(SETTLE)
+
+
+def stage(addr: str, spec: dict, browser: bool) -> None:
+    """Park a restored window until place_staged() puts it in its slot."""
+    dispatch("window.move", window=f"address:{addr}",
+             workspace=STAGING_WORKSPACE, follow=False)
+    time.sleep(SETTLE)
+    _staged.append((addr, spec, browser))
+
+
+def slot_order(spec: dict) -> int:
+    """Saved position among the windows of its workspace; unknown goes last."""
+    order = spec.get("order", spec.get("_spec", {}).get("order"))
+    return order if isinstance(order, int) else 1 << 30
+
+
+def place_staged() -> None:
+    """Move every parked window to its workspace, in saved slot order.
+
+    The sort is stable, so windows without an `order` (an older session file)
+    keep the order they were restored in.
+    """
+    global _staged
+    staged, _staged = _staged or [], None
+    for addr, spec, browser in sorted(staged, key=lambda item: slot_order(item[1])):
+        if browser:
+            move_to(addr, spec["workspace"])
+        else:
+            place(addr, spec)
 
 
 def restore(spec: dict, claimed: set[str], index: int, total: int) -> bool:
@@ -470,7 +512,10 @@ def browser_targets(app: str, specs: list[dict], titles: list[dict]) -> list[dic
 
 
 def place_browser(addr: str, target: dict) -> None:
-    move_to(addr, target["workspace"])
+    if _staged is not None:
+        stage(addr, target, browser=True)
+    else:
+        move_to(addr, target["workspace"])
     if "_spec" in target:
         target["_spec"]["_restored_address"] = addr
 
@@ -977,11 +1022,18 @@ def main() -> int:
     claimed: set[str] = set()
     started = time.monotonic()
     ok = 0
-    for app, specs in browser_specs.items():
-        ok += restore_browser(app, specs, title_records, claimed)
-    reserve_existing(plain, mapped())
-    for i, spec in enumerate(plain, start=1):
-        ok += restore(spec, claimed, i, len(plain))
+    global _staged
+    if os.environ.get("OMASESSION_RESTORE_ORDER", "true") != "false":
+        _staged = []
+    try:
+        for app, specs in browser_specs.items():
+            ok += restore_browser(app, specs, title_records, claimed)
+        reserve_existing(plain, mapped())
+        for i, spec in enumerate(plain, start=1):
+            ok += restore(spec, claimed, i, len(plain))
+    finally:
+        # Also on an exception: a window left parked would be hidden for good.
+        place_staged()
     # Retain excluded apps on affected desks for the completeness check. An
     # app-only restore must not stretch half of a saved layout over the desk
     # just because its other apps have not been opened yet.
