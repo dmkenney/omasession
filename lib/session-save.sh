@@ -379,35 +379,6 @@ if (( count_new < count_screen )); then
     PARTIAL=1
 fi
 
-# A third rule, for a desktop that is going away. Omarchy's logout closes every
-# window, waits up to 2s, then ends the session; a timer tick inside that gap
-# sees the one or two windows still closing, and the rules above publish them
-# over the real session. So a save with FEWER windows than the saved session is
-# held once and only published if the next save, one tick later, still finds
-# fewer -- any count, since you may keep closing windows. A logout ends the
-# session before that second save; a blip (more windows again) cancels the
-# hold. The note is only valid 20-90s after it was written: one left over from
-# before a logout must not confirm a half-finished restore at the next login.
-# Cost: windows closed less than one tick before logging out come back.
-SHRINK_NOTE="$SESSION_DIR/.shrink-pending"
-if (( count_new < count_old )) && [[ "${OMASESSION_CONFIRM_SHRINK:-true}" != "false" ]]; then
-    now="$(date +%s)"
-    since="$(cat "$SHRINK_NOTE" 2>/dev/null || echo 0)"
-    [[ "$since" =~ ^[0-9]+$ ]] || since=0
-    age=$(( now - since ))
-    if (( age > 90 )); then
-        printf '%s\n' "$now" > "$SHRINK_NOTE"
-        err "holding a smaller session ($count_new window(s), $count_old saved) until the next save confirms it"
-        exit 3
-    fi
-    if (( age < 20 )); then
-        err "smaller session ($count_new window(s), $count_old saved) not confirmed yet -- waiting for the next tick"
-        exit 3
-    fi
-    err "smaller session confirmed after ${age}s: $count_new window(s) replace $count_old"
-fi
-rm -f "$SHRINK_NOTE"
-
 # Um selo igual nos dois arquivos. Dois renames não são uma transação, então em
 # vez de fingir que são, o par carrega de que geração cada metade veio e o
 # replay pode detectar um par rasgado em vez de restaurar meia sessão achando

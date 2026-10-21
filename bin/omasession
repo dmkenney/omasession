@@ -219,15 +219,10 @@ cmd_save() {
     # terminalPrograms: comma list of programs to relaunch inside their
     # terminal (e.g. "nvim,btop"); empty by default (lib/capture.py).
     terminal_programs="$(config_get terminalPrograms "")"
-    # confirmShrink: hold a save with fewer windows until the next tick agrees,
-    # so a save during logout can't replace the session (lib/session-save.sh).
-    local confirm_shrink
-    confirm_shrink="$(config_get confirmShrink true)"
     repair_chrome="$(config_get browserRepairChrome "$DEFAULT_BROWSER_REPAIR_CHROME")"
     set +e
     out="$(OMASESSION_BROWSER_REPAIR="$repair" \
         OMASESSION_TERMINAL_PROGRAMS="$terminal_programs" \
-        OMASESSION_CONFIRM_SHRINK="$confirm_shrink" \
         OMASESSION_BROWSER_REPAIR_CHROME="$repair_chrome" OMASESSION_STATE_DIR="$STATE_DIR" \
         "$LIB/session-save.sh" "$name" 2>&1)"; rc=$?
     set -e
