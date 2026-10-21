@@ -530,20 +530,31 @@ def terminal_programs(pid: int, allowed: set[str]) -> list[dict]:
     found = []
     if not allowed:
         return found
-    for shell in _children(pid):
-        if _comm(shell) not in SHELLS:
-            continue
-        for kid in _children(shell):
-            argv = from_cmdline(int(kid))
-            name = Path(argv[0]).name if argv else _comm(kid)
-            if name not in allowed:
-                continue
-            try:
-                cwd = os.readlink(f"/proc/{kid}/cwd")
-            except OSError:
-                cwd = None
-            found.append({"shell": shell, "name": name, "argv": argv or [name], "cwd": cwd})
-            break
+
+    def listed(kid: str, shell: str | None) -> dict | None:
+        argv = from_cmdline(int(kid))
+        name = Path(argv[0]).name if argv else _comm(kid)
+        if name not in allowed:
+            return None
+        try:
+            cwd = os.readlink(f"/proc/{kid}/cwd")
+        except OSError:
+            cwd = None
+        return {"shell": shell, "name": name, "argv": argv or [name], "cwd": cwd}
+
+    for child in _children(pid):
+        if _comm(child) in SHELLS:
+            for kid in _children(child):
+                hit = listed(kid, child)
+                if hit:
+                    found.append(hit)
+                    break
+        else:
+            # A terminal started with `-e program` (as a restore does) runs it
+            # directly, with no shell in between.
+            hit = listed(child, None)
+            if hit:
+                found.append(hit)
     return found
 
 

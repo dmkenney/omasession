@@ -38,6 +38,19 @@ class ProgramWindowCases(unittest.TestCase):
         with patch.object(capture.R, "terminal_programs", return_value=[program("flockr", "11")]):
             self.assertEqual(capture.program_windows(windows, {"flockr"}), {})
 
+    def test_program_started_with_dash_e_has_no_shell_in_between(self) -> None:
+        # After a restore, `ghostty -e flockr` runs flockr directly; the next
+        # save must still see it, or the program is lost one restore later.
+        tree = {"1": ["2", "3"], "2": ["4"], "3": [], "4": []}
+        comm = {"2": "bash", "3": "flockr", "4": "btop"}
+        with patch.object(resolve, "_children", side_effect=lambda pid: tree[str(pid)]), \
+                patch.object(resolve, "_comm", side_effect=lambda pid: comm[str(pid)]), \
+                patch.object(resolve, "from_cmdline", side_effect=lambda pid: [comm[str(pid)]]), \
+                patch.object(resolve.os, "readlink", return_value="/work"):
+            found = resolve.terminal_programs(1, {"flockr", "btop"})
+        self.assertEqual(sorted(p["name"] for p in found), ["btop", "flockr"])
+        self.assertEqual({p["name"]: p["shell"] for p in found}, {"btop": "2", "flockr": None})
+
     def test_nothing_allowed_means_nothing_found(self) -> None:
         self.assertEqual(resolve.terminal_programs(1, set()), [])
 
