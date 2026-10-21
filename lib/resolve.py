@@ -511,6 +511,62 @@ def ghostty_argv(argv: list[str], cwd: str | None) -> list[str]:
     return prefix + [effective[0]] + flags + clean + tail
 
 
+# How each terminal binary is told to run a program instead of a shell.
+# ghostty measured here (`ghostty -e flockr` relaunches the program in its own
+# window); foot and kitty take it after `--`, as TRAILING_ARGV_TERMINALS notes.
+TERMINAL_EXEC_FLAG = {"ghostty": "-e", "foot": "--", "kitty": "--"}
+
+
+def terminal_programs(pid: int, allowed: set[str]) -> list[dict]:
+    """Programs from `allowed` running in a terminal's shells, one per shell.
+
+    A terminal window's shell is a direct child of the terminal process; what
+    the user left running is that shell's child (`ghostty -> bash -> flockr`).
+    Only programs the user listed count: relaunching whatever happened to be in
+    the foreground -- a build, an `rm` -- would run it again at login. Each hit
+    is {"shell", "name", "argv", "cwd"}; matching it to a window is the
+    caller's job, because one terminal process can serve several windows.
+    """
+    found = []
+    if not allowed:
+        return found
+    for shell in _children(pid):
+        if _comm(shell) not in SHELLS:
+            continue
+        for kid in _children(shell):
+            argv = from_cmdline(int(kid))
+            name = Path(argv[0]).name if argv else _comm(kid)
+            if name not in allowed:
+                continue
+            try:
+                cwd = os.readlink(f"/proc/{kid}/cwd")
+            except OSError:
+                cwd = None
+            found.append({"shell": shell, "name": name, "argv": argv or [name], "cwd": cwd})
+            break
+    return found
+
+
+def with_program(argv: list[str], program: dict) -> list[str] | None:
+    """`argv` (a resolved terminal launch) changed to run `program` in it.
+
+    None when the terminal is not one we know how to hand a command to, or the
+    launch already runs something of its own -- that command is left alone.
+    """
+    effective = skip_env_wrapper(argv)
+    if not effective:
+        return None
+    binary = Path(effective[0]).name
+    flag = TERMINAL_EXEC_FLAG.get(binary)
+    if flag is None or child_command_start(effective) is not None:
+        return None
+    if binary == "ghostty":
+        if any(a in ("-e", "--command", "--") for a in effective):
+            return None
+        argv = ghostty_argv(argv, program.get("cwd"))
+    return argv + [flag] + program["argv"]
+
+
 def resolve(window: dict, index: dict[str, dict] | None = None) -> dict:
     """Resolve one window. Always returns a dict; `argv` is None on failure.
 

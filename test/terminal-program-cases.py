@@ -1,0 +1,68 @@
+"""Behavioral contracts for relaunching the program a terminal was running."""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "lib"))
+import capture  # noqa: E402
+import resolve  # noqa: E402
+
+
+def window(address: str, title: str, pid: int = 100) -> dict:
+    return {"address": address, "title": title, "pid": pid, "workspace": {"id": 1}}
+
+
+def program(name: str, shell: str) -> dict:
+    return {"shell": shell, "name": name, "argv": [f"/usr/bin/{name}"], "cwd": "/work"}
+
+
+class ProgramWindowCases(unittest.TestCase):
+    def test_title_match_then_elimination_in_one_terminal_process(self) -> None:
+        # One Ghostty process, two windows: btop names itself, flockr does not.
+        windows = [window("0xa", "dk-desktop: Dotfiles"), window("0xb", "btop")]
+        found = [program("flockr", "11"), program("btop", "12")]
+        with patch.object(capture.R, "terminal_programs", return_value=found):
+            result = capture.program_windows(windows, {"flockr", "btop"})
+        self.assertEqual(result["0xb"]["name"], "btop")
+        self.assertEqual(result["0xa"]["name"], "flockr")
+
+    def test_ambiguous_windows_get_no_program(self) -> None:
+        # Two untitled windows and one program: no way to tell, so neither.
+        windows = [window("0xa", "bash"), window("0xb", "bash")]
+        with patch.object(capture.R, "terminal_programs", return_value=[program("flockr", "11")]):
+            self.assertEqual(capture.program_windows(windows, {"flockr"}), {})
+
+    def test_nothing_allowed_means_nothing_found(self) -> None:
+        self.assertEqual(resolve.terminal_programs(1, set()), [])
+
+    def test_allowed_programs_parse_the_config_list(self) -> None:
+        with patch.dict(capture.os.environ, {"OMASESSION_TERMINAL_PROGRAMS": " flockr, btop ,,"}):
+            self.assertEqual(capture.allowed_programs(), {"flockr", "btop"})
+
+
+class WithProgramCases(unittest.TestCase):
+    def test_ghostty_gets_dash_e_after_its_own_flags(self) -> None:
+        argv = resolve.with_program(["ghostty"], program("flockr", "11"))
+        self.assertEqual(argv, ["ghostty", "--gtk-single-instance=false",
+                                "--working-directory=/work", "-e", "/usr/bin/flockr"])
+
+    def test_foot_gets_the_program_after_double_dash(self) -> None:
+        argv = resolve.with_program(["foot", "--working-directory=/work"], program("btop", "11"))
+        self.assertEqual(argv, ["foot", "--working-directory=/work", "--", "/usr/bin/btop"])
+
+    def test_a_launch_that_already_runs_a_command_is_left_alone(self) -> None:
+        self.assertIsNone(resolve.with_program(["foot", "--", "nvim"], program("btop", "11")))
+        self.assertIsNone(resolve.with_program(["ghostty", "-e", "nvim"], program("btop", "11")))
+
+    def test_unknown_terminal_is_left_alone(self) -> None:
+        self.assertIsNone(resolve.with_program(["wezterm"], program("btop", "11")))
+
+
+if __name__ == "__main__":
+    unittest.main()
