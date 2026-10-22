@@ -221,10 +221,14 @@ cmd_save() {
     # terminalPrograms: comma list of programs to relaunch inside their
     # terminal (e.g. "nvim,btop"); empty by default (lib/capture.py).
     terminal_programs="$(config_get terminalPrograms "")"
+    # excludeClasses: comma list of window classes never saved, on top of the
+    # built-in omasnap and aquamarine (lib/session-save.sh).
+    local exclude_classes; exclude_classes="$(config_get excludeClasses "")"
     repair_chrome="$(config_get browserRepairChrome "$DEFAULT_BROWSER_REPAIR_CHROME")"
     set +e
     out="$(OMASESSION_BROWSER_REPAIR="$repair" \
         OMASESSION_TERMINAL_PROGRAMS="$terminal_programs" \
+        OMASESSION_EXCLUDE_CLASSES="$exclude_classes" \
         OMASESSION_BROWSER_REPAIR_CHROME="$repair_chrome" OMASESSION_STATE_DIR="$STATE_DIR" \
         "$LIB/session-save.sh" "$name" 2>&1)"; rc=$?
     set -e

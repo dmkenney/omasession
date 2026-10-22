@@ -206,7 +206,11 @@ $OMASESSION config set browserRepairChrome true # include Chrome in automatic re
 $OMASESSION config set appRestoreGhostty true  # include Ghostty on login restore
 $OMASESSION config set restoreOrder true       # reopen windows in their saved slot order
 $OMASESSION config set terminalPrograms "nvim,btop" # relaunch these inside their terminal
+$OMASESSION config set excludeClasses "Spotify" # window classes never saved
 ```
+
+omasnap's screenshot preview and a nested Hyprland window (`aquamarine`) are
+never saved, whatever `excludeClasses` says.
 
 The panel's **Google Chrome** action runs `restore-app google-chrome`, asking
 Chrome to restore its own saved windows and tabs before OmaSession places them.

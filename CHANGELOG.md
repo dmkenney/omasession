@@ -6,6 +6,11 @@ request.
 
 ## Unreleased
 
+- Windows that are never worth restoring are left out of saves: omasnap's
+  screenshot preview and a nested Hyprland's window. Add more classes with
+  `excludeClasses`. Before, a preview open during a save was relaunched at
+  login.
+
 - The panel has three tabs. **Windows** is the old list. **Layout** draws the
   screens to scale from the saved monitor geometry (position, size, scale,
   rotation) with each workspace's windows where they sit, so an ultrawide, a

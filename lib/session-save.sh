@@ -201,6 +201,20 @@ if [[ "$NAME" == "last" && "${OMASESSION_BROWSER_REPAIR:-true}" != "false" ]]; t
     fi
 fi
 
+# Windows never worth restoring: omasnap's screenshot preview and a nested
+# Hyprland's window (aquamarine), plus the classes in excludeClasses. Filtered
+# out of the one reading that the guard, the capture and the titles all use,
+# so they still agree on what is on screen.
+EXCLUDE_CLASSES="omasnap,aquamarine${OMASESSION_EXCLUDE_CLASSES:+,$OMASESSION_EXCLUDE_CLASSES}"
+if ! clients="$(jq --arg ex "$EXCLUDE_CLASSES" '
+        ($ex | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $x
+        | map(select(((.class // "") as $c | $x | any(.[]; . == $c)) == false
+                     and ((.initialClass // "") as $c | $x | any(.[]; . == $c)) == false))
+        ' <<<"$clients")"; then
+    err "cannot filter hyprctl clients -- session left untouched"
+    exit 3
+fi
+
 # Special workspaces (scratchpad) have negative ids and are excluded here, as
 # they are in the replay: neither side can place them. A desktop whose windows
 # are all scratchpadded therefore looks empty to this script, and the floor rule
