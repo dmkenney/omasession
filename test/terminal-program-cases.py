@@ -38,6 +38,20 @@ class ProgramWindowCases(unittest.TestCase):
         with patch.object(capture.R, "terminal_programs", return_value=[program("flockr", "11")]):
             self.assertEqual(capture.program_windows(windows, {"flockr"}), {})
 
+    def test_a_title_must_name_the_program_as_a_word(self) -> None:
+        # "top" is not in "btop", and "flockr" is not in "flockr-notes".
+        windows = [window("0xa", "btop"), window("0xb", "flockr-notes")]
+        found = [program("top", "11"), program("flockr", "12")]
+        with patch.object(capture.R, "terminal_programs", return_value=found):
+            self.assertEqual(capture.program_windows(windows, {"top", "flockr"}), {})
+
+    def test_two_of_the_same_program_are_not_matched_by_title(self) -> None:
+        # Only one title names btop; which btop it is cannot be known.
+        windows = [window("0xa", "btop"), window("0xb", "bash")]
+        found = [program("btop", "11"), program("btop", "12")]
+        with patch.object(capture.R, "terminal_programs", return_value=found):
+            self.assertEqual(capture.program_windows(windows, {"btop"}), {})
+
     def test_program_started_with_dash_e_has_no_shell_in_between(self) -> None:
         # After a restore, `ghostty -e flockr` runs flockr directly; the next
         # save must still see it, or the program is lost one restore later.
@@ -68,6 +82,13 @@ class WithProgramCases(unittest.TestCase):
     def test_foot_gets_the_program_after_double_dash(self) -> None:
         argv = resolve.with_program(["foot", "--working-directory=/work"], program("btop", "11"))
         self.assertEqual(argv, ["foot", "--working-directory=/work", "--", "/usr/bin/btop"])
+
+    def test_foot_and_kitty_start_in_the_programs_directory(self) -> None:
+        moved = {**program("btop", "11"), "cwd": "/elsewhere"}
+        self.assertEqual(resolve.with_program(["foot", "-D", "/work", "--title", "t"], moved),
+                         ["foot", "--title", "t", "--working-directory=/elsewhere", "--", "/usr/bin/btop"])
+        self.assertEqual(resolve.with_program(["kitty", "--directory=/work"], moved),
+                         ["kitty", "--directory=/elsewhere", "--", "/usr/bin/btop"])
 
     def test_a_launch_that_already_runs_a_command_is_left_alone(self) -> None:
         self.assertIsNone(resolve.with_program(["foot", "--", "nvim"], program("btop", "11")))

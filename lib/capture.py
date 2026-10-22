@@ -22,6 +22,7 @@ caller decides where the result goes, same as before.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -142,8 +143,14 @@ def program_windows(windows: list[dict], allowed: set[str]) -> dict[str, dict]:
         if not programs:
             continue
         left = list(wins)
+        names = [p["name"].lower() for p in programs]
         for program in list(programs):
-            named = [w for w in left if program["name"].lower() in w.get("title", "").lower()]
+            # Two of the same program in one process: a title cannot say which
+            # is which, so neither is matched by title.
+            if names.count(program["name"].lower()) > 1:
+                continue
+            word = re.compile(rf"(?<![\w.-]){re.escape(program['name'])}(?![\w.-])", re.I)
+            named = [w for w in left if word.search(w.get("title", ""))]
             if len(named) == 1:
                 result[named[0].get("address", "")] = program
                 left.remove(named[0])

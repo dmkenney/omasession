@@ -649,7 +649,31 @@ def with_program(argv: list[str], program: dict) -> list[str] | None:
         if any(a in ("-e", "--command", "--") for a in effective):
             return None
         argv = ghostty_argv(argv, program.get("cwd"))
+    elif program.get("cwd") and binary in CWD_OPTIONS:
+        # The program may have changed directory since the terminal opened:
+        # its own directory replaces the one the terminal was started with.
+        argv = drop_cwd_option(argv, binary) + [f"{CWD_OPTIONS[binary][0]}={program['cwd']}"]
     return argv + [flag] + program["argv"]
+
+
+CWD_OPTIONS = {"foot": ("--working-directory", "-D"), "kitty": ("--directory", "-d")}
+
+
+def drop_cwd_option(argv: list[str], binary: str) -> list[str]:
+    """`argv` without the terminal's working-directory option and its value."""
+    long, short = CWD_OPTIONS[binary]
+    out, skip = [], False
+    for arg in argv:
+        if skip:
+            skip = False
+            continue
+        if arg in (long, short):
+            skip = True
+            continue
+        if arg.startswith(long + "=") or (arg.startswith(short) and len(arg) > 2):
+            continue
+        out.append(arg)
+    return out
 
 
 def resolve(window: dict, index: dict[str, dict] | None = None) -> dict:
