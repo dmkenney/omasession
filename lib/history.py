@@ -32,7 +32,7 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from safe_fs import Refused, copy_within, open_dir_chain  # noqa: E402
+from safe_fs import Refused, copy_within, open_dir_chain, read_capped_path  # noqa: E402
 
 import os  # noqa: E402
 
@@ -45,8 +45,8 @@ RESERVED = re.compile(r"(^last$|\.prev$|^history-|^omasession\.)")
 
 def load(path: Path) -> list[dict]:
     try:
-        return tomllib.loads(path.read_text()).get("window", [])
-    except (OSError, tomllib.TOMLDecodeError):
+        return tomllib.loads(read_capped_path(path).decode()).get("window", [])
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
         return []
 
 
@@ -63,7 +63,10 @@ def stamp_time(name: str) -> float | None:
     match = STAMP.match(name)
     if not match:
         return None
-    return float(calendar.timegm(time.strptime(match.group(1), "%Y%m%d-%H%M%S")))
+    try:
+        return float(calendar.timegm(time.strptime(match.group(1), "%Y%m%d-%H%M%S")))
+    except ValueError:  # matches the pattern but is no date (month 13)
+        return None
 
 
 def snapshots(session_dir: Path) -> list[tuple[float, str]]:
@@ -76,10 +79,18 @@ def snapshots(session_dir: Path) -> list[tuple[float, str]]:
     return sorted(found, reverse=True)
 
 
-def keep(snaps: list[tuple[float, str]], now: float) -> set[str]:
-    """Which snapshots survive thinning: the newest in each tier bucket."""
+def keep(snaps: list[tuple[float, str]], now: float,
+         sizes: dict[str, int] | None = None) -> set[str]:
+    """Which snapshots survive thinning: the newest in each tier bucket, and
+    the one with the most windows when that is a different one.
+
+    The fullest is kept because the newest can be what was left after a crash
+    or a bad restore -- the state worth going back to is the one before it.
+    """
+    sizes = sizes or {}
     kept: set[str] = set()
-    seen_buckets: set[tuple[int, int]] = set()
+    newest: set[tuple[int, int]] = set()
+    fullest: dict[tuple[int, int], str] = {}
     for when, stem in snaps:  # newest first
         age = now - when
         for tier, (limit, bucket) in enumerate(TIERS):
@@ -89,11 +100,13 @@ def keep(snaps: list[tuple[float, str]], now: float) -> set[str]:
                 kept.add(stem)
             else:
                 key = (tier, int(when // bucket))
-                if key not in seen_buckets:
-                    seen_buckets.add(key)
+                if key not in newest:
+                    newest.add(key)
                     kept.add(stem)
+                if sizes.get(stem, 0) > sizes.get(fullest.get(key, ""), 0):
+                    fullest[key] = stem
             break
-    return kept
+    return kept | set(fullest.values())
 
 
 def snapshot(session_dir: Path, now: float | None = None) -> str | None:
@@ -116,7 +129,8 @@ def snapshot(session_dir: Path, now: float | None = None) -> str | None:
                 os.close(dir_fd)
             snaps.insert(0, (now, stem))
             made = stem
-    survivors = keep(snaps, now)
+    sizes = {stem: len(load(session_dir / f"{stem}.toml")) for _, stem in snaps}
+    survivors = keep(snaps, now, sizes)
     for _, stem in snaps:
         if stem not in survivors:
             for suffix in (".toml", ".titles.json"):

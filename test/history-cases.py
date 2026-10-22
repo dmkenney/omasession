@@ -43,9 +43,21 @@ class ThinningCases(unittest.TestCase):
         self.assertIn(stem(1000), kept)          # newest of its bucket
         self.assertNotIn(stem(1100), kept)
 
+    def test_the_fullest_snapshot_of_a_bucket_survives_a_drop(self) -> None:
+        # Within one hour bucket: 20 windows, then a crash left 3. The newest
+        # (3) is kept as always; the 20 is kept too.
+        full, after = stem(3 * 3600 + 60), stem(3 * 3600)
+        snaps = [(NOW - 3 * 3600, after), (NOW - 3 * 3600 - 60, full)]
+        kept = history.keep(snaps, NOW, {full: 20, after: 3})
+        self.assertEqual(kept, {full, after})
+        self.assertEqual(history.keep(snaps, NOW, {full: 3, after: 20}), {after})
+
     def test_stamp_round_trips(self) -> None:
         self.assertAlmostEqual(history.stamp_time(stem(120) + ".toml"), NOW - 120, delta=1)
         self.assertIsNone(history.stamp_time("work.toml"))
+
+    def test_a_stamp_that_is_no_date_is_ignored(self) -> None:
+        self.assertIsNone(history.stamp_time("history-20261301-000000.toml"))
 
 
 class SnapshotCases(unittest.TestCase):
@@ -85,6 +97,12 @@ class SnapshotCases(unittest.TestCase):
         self.assertEqual(data["named"][0]["windows"], 2)
         self.assertEqual(len(data["history"]), 1)
 
+
+    def test_a_bad_history_name_does_not_break_list_or_snapshot(self) -> None:
+        (self.dir / "history-20261301-000000.toml").write_text(toml([]))
+        self.write_last([("ghostty", "1", 0, "t")])
+        self.assertIsNotNone(history.snapshot(self.dir, NOW))
+        self.assertEqual(len(history.listing(self.dir, NOW)["history"]), 1)
 
 if __name__ == "__main__":
     unittest.main()
