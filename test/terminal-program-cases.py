@@ -52,6 +52,12 @@ class ProgramWindowCases(unittest.TestCase):
         with patch.object(capture.R, "terminal_programs", return_value=found):
             self.assertEqual(capture.program_windows(windows, {"btop"}), {})
 
+    def test_a_title_naming_two_programs_matches_neither(self) -> None:
+        windows = [window("0xa", "nvim btop"), window("0xb", "bash")]
+        found = [program("nvim", "11"), program("btop", "12")]
+        with patch.object(capture.R, "terminal_programs", return_value=found):
+            self.assertEqual(capture.program_windows(windows, {"nvim", "btop"}), {})
+
     def test_program_started_with_dash_e_has_no_shell_in_between(self) -> None:
         # After a restore, `ghostty -e flockr` runs flockr directly; the next
         # save must still see it, or the program is lost one restore later.
@@ -89,6 +95,12 @@ class WithProgramCases(unittest.TestCase):
                          ["foot", "--title", "t", "--working-directory=/elsewhere", "--", "/usr/bin/btop"])
         self.assertEqual(resolve.with_program(["kitty", "--directory=/work"], moved),
                          ["kitty", "--directory=/elsewhere", "--", "/usr/bin/btop"])
+
+    def test_another_options_value_is_never_taken_for_the_directory(self) -> None:
+        moved = {**program("btop", "11"), "cwd": "/elsewhere"}
+        self.assertEqual(resolve.with_program(["foot", "--title", "-Dashboard"], moved),
+                         ["foot", "--title", "-Dashboard", "--working-directory=/elsewhere",
+                          "--", "/usr/bin/btop"])
 
     def test_a_launch_that_already_runs_a_command_is_left_alone(self) -> None:
         self.assertIsNone(resolve.with_program(["foot", "--", "nvim"], program("btop", "11")))

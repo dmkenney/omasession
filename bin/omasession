@@ -280,7 +280,8 @@ cmd_restore() {
     # `exec` abaixo troca este shell pelo replay, mas o descritor 9 sobrevive a
     # troca: o lock fica seguro pelo processo do replay e e liberado quando ele
     # termina, inclusive se ele morrer.
-    exec 9>"$SESSION_DIR/.$name.lock"
+    # `>>`, not `>`: opening the lock must never truncate whatever it names.
+    exec 9>>"$SESSION_DIR/.$name.lock"
     if ! flock -n 9; then
         die "a save is running -- refusing to restore on top of it"
     fi
@@ -288,7 +289,7 @@ cmd_restore() {
     # same, so the timer's save of `last` has to wait for it too -- otherwise it
     # can publish the half-restored desktop over `last`.
     if [[ "$name" != last ]]; then
-        exec 8>"$SESSION_DIR/.last.lock"
+        exec 8>>"$SESSION_DIR/.last.lock"
         if ! flock -n 8; then
             die "a save is running -- refusing to restore on top of it"
         fi

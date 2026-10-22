@@ -57,10 +57,35 @@ class ReplayOrderCases(unittest.TestCase):
         self.assertEqual(len(replay._staged), 3)
 
         with patch.object(replay, "place", side_effect=lambda a, s: placed.append(a)), \
-                patch.object(replay, "move_to", side_effect=lambda a, w: placed.append(a)):
+                patch.object(replay, "move_to", side_effect=lambda a, w: placed.append(a)), \
+                patch.object(replay, "release_parked"):
             replay.place_staged()
         self.assertEqual(placed, ["0xb", "0xa", "0xc"])
         self.assertIsNone(replay._staged)
+
+    def test_sigterm_during_placement_waits_until_every_window_is_out(self) -> None:
+        import os
+        import signal
+        placed: list[str] = []
+        released: list[dict] = []
+
+        def place(addr, spec):
+            if not placed:
+                os.kill(os.getpid(), signal.SIGTERM)
+            placed.append(addr)
+
+        replay._staged = [("0xa", {"workspace": "1", "order": 0}, False),
+                          ("0xb", {"workspace": "2", "order": 1}, False)]
+        old = signal.signal(signal.SIGTERM, replay.exit_on_signal)
+        try:
+            with patch.object(replay, "place", side_effect=place), \
+                    patch.object(replay, "release_parked", side_effect=released.append), \
+                    self.assertRaises(SystemExit):
+                replay.place_staged()
+        finally:
+            signal.signal(signal.SIGTERM, old)
+        self.assertEqual(placed, ["0xa", "0xb"])
+        self.assertEqual(released, [{"0xa": "1", "0xb": "2"}])
 
     def test_windows_without_order_keep_restore_order_after_ordered_ones(self) -> None:
         items = [("0xa", {}, False), ("0xb", {"order": 0}, False), ("0xc", {}, False)]

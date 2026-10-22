@@ -144,13 +144,17 @@ def program_windows(windows: list[dict], allowed: set[str]) -> dict[str, dict]:
             continue
         left = list(wins)
         names = [p["name"].lower() for p in programs]
+
+        def names_in(title: str) -> set[str]:
+            return {n for n in names
+                    if re.search(rf"(?<![\w.-]){re.escape(n)}(?![\w.-])", title, re.I)}
+
         for program in list(programs):
-            # Two of the same program in one process: a title cannot say which
-            # is which, so neither is matched by title.
+            # Two of the same program in one process, or a title naming two
+            # programs: the title cannot say which is which, so no match.
             if names.count(program["name"].lower()) > 1:
                 continue
-            word = re.compile(rf"(?<![\w.-]){re.escape(program['name'])}(?![\w.-])", re.I)
-            named = [w for w in left if word.search(w.get("title", ""))]
+            named = [w for w in left if names_in(w.get("title", "")) == {program["name"].lower()}]
             if len(named) == 1:
                 result[named[0].get("address", "")] = program
                 left.remove(named[0])

@@ -307,17 +307,23 @@ def place_staged() -> None:
     """
     global _staged
     staged, _staged = _staged or [], None
-    for addr, spec, browser in sorted(staged, key=lambda item: slot_order(item[1])):
-        # One failed move must not leave the rest parked.
-        try:
-            if browser:
-                move_to(addr, spec["workspace"])
-            else:
-                place(addr, spec)
-        except Exception as exc:
-            print(f"  ! could not place {addr}: {exc}")
-    targets = {addr: spec.get("workspace") for addr, spec, _ in staged}
-    release_parked(targets)
+    # A SIGTERM here would stop placement half-way; hold it until every
+    # window is out, then it is delivered as usual.
+    stop = {signal.SIGTERM, signal.SIGHUP}
+    signal.pthread_sigmask(signal.SIG_BLOCK, stop)
+    try:
+        for addr, spec, browser in sorted(staged, key=lambda item: slot_order(item[1])):
+            # One failed move must not leave the rest parked.
+            try:
+                if browser:
+                    move_to(addr, spec["workspace"])
+                else:
+                    place(addr, spec)
+            except Exception as exc:
+                print(f"  ! could not place {addr}: {exc}")
+        release_parked({addr: spec.get("workspace") for addr, spec, _ in staged})
+    finally:
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, stop)
 
 
 def release_parked(targets: dict[str, object] | None = None) -> int:

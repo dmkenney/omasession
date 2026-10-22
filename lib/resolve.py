@@ -660,7 +660,11 @@ CWD_OPTIONS = {"foot": ("--working-directory", "-D"), "kitty": ("--directory", "
 
 
 def drop_cwd_option(argv: list[str], binary: str) -> list[str]:
-    """`argv` without the terminal's working-directory option and its value."""
+    """`argv` without the terminal's working-directory option and its value.
+
+    Only the exact `--opt=value`, `--opt value` and `-D value` forms: a token
+    that merely starts with `-D` may be another option's value (a title).
+    """
     long, short = CWD_OPTIONS[binary]
     out, skip = [], False
     for arg in argv:
@@ -670,7 +674,7 @@ def drop_cwd_option(argv: list[str], binary: str) -> list[str]:
         if arg in (long, short):
             skip = True
             continue
-        if arg.startswith(long + "=") or (arg.startswith(short) and len(arg) > 2):
+        if arg.startswith(long + "="):
             continue
         out.append(arg)
     return out
