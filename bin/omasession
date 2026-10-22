@@ -284,6 +284,15 @@ cmd_restore() {
     if ! flock -n 9; then
         die "a save is running -- refusing to restore on top of it"
     fi
+    # Restoring another name (`work`, a history snapshot) parks windows just the
+    # same, so the timer's save of `last` has to wait for it too -- otherwise it
+    # can publish the half-restored desktop over `last`.
+    if [[ "$name" != last ]]; then
+        exec 8>"$SESSION_DIR/.last.lock"
+        if ! flock -n 8; then
+            die "a save is running -- refusing to restore on top of it"
+        fi
+    fi
 
     # browserRestore ainda nao e respeitado: replay.py nao le a opcao. Dizer
     # isso e melhor que exportar uma variavel que ninguem consome -- uma opcao

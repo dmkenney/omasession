@@ -25,6 +25,7 @@ import difflib
 import contextlib
 import json
 import shlex
+import signal
 import re
 import os
 import subprocess
@@ -301,10 +302,46 @@ def place_staged() -> None:
     global _staged
     staged, _staged = _staged or [], None
     for addr, spec, browser in sorted(staged, key=lambda item: slot_order(item[1])):
-        if browser:
-            move_to(addr, spec["workspace"])
-        else:
-            place(addr, spec)
+        # One failed move must not leave the rest parked.
+        try:
+            if browser:
+                move_to(addr, spec["workspace"])
+            else:
+                place(addr, spec)
+        except Exception as exc:
+            print(f"  ! could not place {addr}: {exc}")
+    targets = {addr: spec.get("workspace") for addr, spec, _ in staged}
+    release_parked(targets)
+
+
+def release_parked(targets: dict[str, object] | None = None) -> int:
+    """Move anything still on the staging workspace to where it belongs.
+
+    A move the compositor dropped, or a restore killed mid-way, would otherwise
+    leave windows hidden there -- and the next save would not see them. A window
+    with no known target goes to the active workspace. Returns how many moved.
+    """
+    targets = targets or {}
+    moved = 0
+    parked = [c for c in clients()
+              if c.get("workspace", {}).get("name") == STAGING_WORKSPACE]
+    if not parked:
+        return 0
+    try:
+        active = json.loads(subprocess.run(
+            ["hyprctl", "activeworkspace", "-j"], capture_output=True,
+            text=True, timeout=15).stdout)["id"]
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError, TypeError):
+        active = 1
+    for c in parked:
+        ws = targets.get(c["address"])
+        try:
+            move_to(c["address"], ws if ws is not None else active)
+        except Exception as exc:
+            print(f"  ! could not release {c['address']}: {exc}")
+            continue
+        moved += 1
+    return moved
 
 
 def restore(spec: dict, claimed: set[str], index: int, total: int) -> bool:
@@ -1054,6 +1091,10 @@ def main() -> int:
         else:
             plain.append(spec)
 
+    # Windows a killed earlier restore left parked come back first.
+    if release_parked():
+        print("released windows an earlier restore left parked")
+
     claimed: set[str] = set()
     started = time.monotonic()
     ok = 0
@@ -1146,5 +1187,13 @@ def run_logged() -> int:
             os.close(log_fd)
 
 
+def exit_on_signal(signum, _frame) -> None:
+    """SIGTERM/SIGHUP (logout, a killed shell) unwind through the finally
+    blocks, so parked windows still get placed."""
+    raise SystemExit(128 + signum)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, exit_on_signal)
+    signal.signal(signal.SIGHUP, exit_on_signal)
     sys.exit(run_logged())
