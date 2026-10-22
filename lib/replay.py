@@ -306,11 +306,11 @@ def place_staged() -> None:
     keep the order they were restored in.
     """
     global _staged
-    staged, _staged = _staged or [], None
     # A SIGTERM here would stop placement half-way; hold it until every
     # window is out, then it is delivered as usual.
     stop = {signal.SIGTERM, signal.SIGHUP}
     signal.pthread_sigmask(signal.SIG_BLOCK, stop)
+    staged, _staged = _staged or [], None
     try:
         for addr, spec, browser in sorted(staged, key=lambda item: slot_order(item[1])):
             # One failed move must not leave the rest parked.

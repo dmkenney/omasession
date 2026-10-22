@@ -80,6 +80,17 @@ class ProgramWindowCases(unittest.TestCase):
 
 
 class WithProgramCases(unittest.TestCase):
+    def setUp(self) -> None:
+        isdir = patch.object(resolve.os.path, "isdir", return_value=True)
+        isdir.start()
+        self.addCleanup(isdir.stop)
+
+    def test_a_program_folder_that_is_gone_keeps_the_terminals_own(self) -> None:
+        moved = {**program("btop", "11"), "cwd": "/gone"}
+        with patch.object(resolve.os.path, "isdir", return_value=False):
+            self.assertEqual(resolve.with_program(["foot", "--working-directory=/work"], moved),
+                             ["foot", "--working-directory=/work", "--", "/usr/bin/btop"])
+
     def test_ghostty_gets_dash_e_after_its_own_flags(self) -> None:
         argv = resolve.with_program(["ghostty"], program("flockr", "11"))
         self.assertEqual(argv, ["ghostty", "--gtk-single-instance=false",

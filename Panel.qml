@@ -778,6 +778,7 @@ Panel {
                     focusable: true
                     enabled: !root.mockMode && !restoreProc.running
                              && !browserRestoreProc.running && !restoreNamedProc.running
+                             && !ghosttyRestoreProc.running
                     onClicked: restoreProc.running = true
                   }
                 }
@@ -1199,6 +1200,7 @@ Panel {
                   bordered: true
                   focusable: true
                   enabled: !root.mockMode && !saveAsProc.running
+                           && !restoreProc.running && !restoreNamedProc.running
                            && /^[A-Za-z0-9][A-Za-z0-9 _-]{0,40}$/.test(saveAsField.text.trim())
                   onClicked: {
                     saveAsProc.name = saveAsField.text.trim()

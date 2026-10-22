@@ -281,17 +281,18 @@ cmd_restore() {
     # troca: o lock fica seguro pelo processo do replay e e liberado quando ele
     # termina, inclusive se ele morrer.
     # `>>`, not `>`: opening the lock must never truncate whatever it names.
+    # A timer save takes a few seconds; wait for it rather than fail.
     exec 9>>"$SESSION_DIR/.$name.lock"
-    if ! flock -n 9; then
-        die "a save is running -- refusing to restore on top of it"
+    if ! flock -w 10 9; then
+        die "a save or restore is running -- refusing to restore on top of it"
     fi
     # Restoring another name (`work`, a history snapshot) parks windows just the
     # same, so the timer's save of `last` has to wait for it too -- otherwise it
     # can publish the half-restored desktop over `last`.
     if [[ "$name" != last ]]; then
         exec 8>>"$SESSION_DIR/.last.lock"
-        if ! flock -n 8; then
-            die "a save is running -- refusing to restore on top of it"
+        if ! flock -w 10 8; then
+            die "a save or restore is running -- refusing to restore on top of it"
         fi
     fi
 

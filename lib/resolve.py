@@ -649,7 +649,7 @@ def with_program(argv: list[str], program: dict) -> list[str] | None:
         if any(a in ("-e", "--command", "--") for a in effective):
             return None
         argv = ghostty_argv(argv, program.get("cwd"))
-    elif program.get("cwd") and binary in CWD_OPTIONS:
+    elif program.get("cwd") and binary in CWD_OPTIONS and os.path.isdir(program["cwd"]):
         # The program may have changed directory since the terminal opened:
         # its own directory replaces the one the terminal was started with.
         argv = drop_cwd_option(argv, binary) + [f"{CWD_OPTIONS[binary][0]}={program['cwd']}"]
