@@ -138,7 +138,13 @@ def last_active_profiles(app: str) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return []
     profiles = state.get("profile", {}).get("last_active_profiles", [])
-    return [p for p in profiles if isinstance(p, str) and p and "/" not in p]
+    return [p for p in profiles if isinstance(p, str) and valid_profile(p)]
+
+
+def valid_profile(name: str) -> bool:
+    """A single folder name: no path separator, not empty, not `.` or `..`."""
+    return bool(name) and "/" not in name and "\\" not in name and "\0" not in name \
+        and name not in (".", "..")
 
 
 def hypr(lua: str) -> str:
@@ -634,6 +640,11 @@ def arm_browser_profile(app: str, profile: str = "Default") -> bool:
     refusal when the browser is running.
     """
     spec = BROWSERS[app]
+    # The name comes from the session file or Local State: one plain folder
+    # name inside the browser's directory, or nothing gets written.
+    if not valid_profile(profile):
+        print(f"  ! ignoring browser profile {profile!r}: not a profile folder name")
+        return False
     prefs = profile_root(app) / profile / "Preferences"
     if not prefs.is_file():
         return False
@@ -784,7 +795,12 @@ def restore_browser(app: str, specs: list[dict], titles: list[dict],
         if not armed:
             print(f"  ! no profile for {app}, falling back to per-window launch")
             return sum(restore(s, claimed, i, want) for i, s in enumerate(specs, 1))
-        repair_browser_session(app, want)
+        # The repair reads Default's session and counts every saved window, so
+        # it is only right when Default is the one profile being restored.
+        if armed == ["Default"]:
+            repair_browser_session(app, want)
+        elif app in SESSION_REPAIR_BROWSERS:
+            print(f"  {app} session: left as is: {len(armed)} profiles restored")
         known = {c["address"] for c in mapped()} | claimed
         for i, profile in enumerate(armed):
             cmd = browser_command(raw_cmd, profile=profile)

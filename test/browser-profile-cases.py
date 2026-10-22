@@ -74,5 +74,17 @@ class ProfileCases(unittest.TestCase):
             self.assertEqual(json.loads(prefs.read_text())["profile"]["exit_type"], "Normal")
 
 
+    def test_a_profile_name_that_is_a_path_is_never_armed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "Brave"
+            root.mkdir()
+            outside = Path(tmp) / "Preferences"
+            outside.write_text("{}")
+            with patch.object(replay, "profile_root", return_value=root), \
+                    patch.object(replay, "profile_in_use", return_value=False):
+                for name in ("..", ".", "", "/etc", "a/b"):
+                    self.assertFalse(replay.arm_browser_profile("brave-browser", name), name)
+            self.assertEqual(outside.read_text(), "{}")
+
 if __name__ == "__main__":
     unittest.main()
