@@ -4,6 +4,12 @@ User-visible changes to OmaSession are recorded here. Marketplace verification
 is a separate process tied to the exact repository commit in its verification
 request.
 
+## Unreleased
+
+- `omasession delete <name>` removes a named session or a history entry, and
+  the panel's Saved tab has a Delete button (click twice to confirm). `last`
+  cannot be deleted.
+
 ## 0.6.0 — 2026-11-02
 
 - Each restore keeps its own log in `~/.local/state/omasession/restores/`
