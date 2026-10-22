@@ -45,5 +45,13 @@ class LoadCases(unittest.TestCase):
         self.assertEqual(data["windows"][0]["label"], "Ghostty · btop")
 
 
+    def test_a_monitor_with_nothing_to_place_it_is_left_out(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / "old.toml").write_text('[session]\nname = "old"\n')
+            (d / "old.titles.json").write_text(json.dumps({"monitors": [{"id": 0, "name": "DP-1"}]}))
+            data = layout.load(d, "old")
+        self.assertEqual(data["monitors"], [])
+
 if __name__ == "__main__":
     unittest.main()

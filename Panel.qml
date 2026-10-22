@@ -777,7 +777,7 @@ Panel {
                     bordered: true
                     focusable: true
                     enabled: !root.mockMode && !restoreProc.running
-                             && !browserRestoreProc.running
+                             && !browserRestoreProc.running && !restoreNamedProc.running
                     onClicked: restoreProc.running = true
                   }
                 }
@@ -874,6 +874,7 @@ Panel {
                                && root.chromeInstalled && root.chromeCaptured
                                && !browserRestoreProc.running && !ghosttyRestoreProc.running
                                && !restoreProc.running && !saveProc.running
+                               && !restoreNamedProc.running
                       onClicked: {
                         root.browserRestoreOutput = ""
                         root.browserRestoreError = ""
@@ -950,6 +951,7 @@ Panel {
                                && root.ghosttyInstalled && root.ghosttyCaptured
                                && !ghosttyRestoreProc.running && !browserRestoreProc.running
                                && !restoreProc.running && !saveProc.running
+                               && !restoreNamedProc.running
                       onClicked: {
                         root.browserRestoreOutput = ""
                         root.browserRestoreError = ""
@@ -1189,7 +1191,7 @@ Panel {
                   foreground: root.fg
                   font.family: Style.font.family
                   font.pixelSize: Style.font.body
-                  onAccepted: saveAsButton.clicked()
+                  onAccepted: if (saveAsButton.enabled) saveAsButton.clicked()
                 }
                 Button {
                   id: saveAsButton
@@ -1293,6 +1295,7 @@ Panel {
                         bordered: true
                         focusable: true
                         enabled: !root.mockMode && !restoreNamedProc.running && !restoreProc.running
+                                 && !browserRestoreProc.running && !ghosttyRestoreProc.running
                         onClicked: {
                           restoreNamedProc.name = modelData.name
                           root.savedMessage = "Restoring \"" + modelData.name + "\"…"

@@ -51,10 +51,10 @@ def label(window: dict) -> str:
 def load(session_dir: Path, name: str) -> dict:
     toml = session_dir / f"{name}.toml"
     sidecar = session_dir / f"{name}.titles.json"
-    windows = tomllib.loads(toml.read_text()).get("window", [])
+    windows = tomllib.loads(captured._read_capped(toml)).get("window", [])
     try:
-        side = json.loads(sidecar.read_text())
-    except (OSError, json.JSONDecodeError):
+        side = json.loads(captured._read_capped(sidecar))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         side = {}
 
     monitors = []
@@ -83,6 +83,8 @@ def load(session_dir: Path, name: str) -> dict:
                 x0 = min(b["x"] for b in mine); y0 = min(b["y"] for b in mine)
                 x1 = max(b["x"] + b["w"] for b in mine); y1 = max(b["y"] + b["h"] for b in mine)
                 mon["box"] = {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
+    # A monitor nothing places (an older, empty save) cannot be drawn.
+    monitors = [m for m in monitors if m["box"] is not None]
     if not monitors and out_windows:
         boxes = [w["box"] for w in out_windows]
         x0 = min(b["x"] for b in boxes); y0 = min(b["y"] for b in boxes)
@@ -101,7 +103,7 @@ def main() -> int:
         return 2
     try:
         print(json.dumps(load(Path(sys.argv[1]), sys.argv[2])))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         print(json.dumps({"error": str(exc)}))
         return 1
     return 0
