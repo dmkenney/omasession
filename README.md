@@ -280,7 +280,11 @@ $OMASESSION config set browserRepairChrome true # include Chrome in that repair
 $OMASESSION config set appRestoreGhostty true  # include Ghostty in the login restore
 $OMASESSION config set terminalPrograms "nvim,btop" # programs a terminal comes back running
 $OMASESSION config set restoreOrder auto       # slot order only with window_slot_order(); true/false force it
+$OMASESSION config set excludeClasses "Spotify" # window classes never saved
 ```
+
+omasnap's screenshot preview and a nested Hyprland window (`aquamarine`) are
+never saved, whatever `excludeClasses` says.
 
 ## Remove
 
