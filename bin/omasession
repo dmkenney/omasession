@@ -8,6 +8,7 @@
 #   omasession restore-app [app]     restore one app from the saved session
 #   omasession status [--json]    what was captured, when, and what is wrong
 #   omasession list [--json]      named sessions and the history of `last`
+#   omasession delete <name>      remove a named session or history entry
 #   omasession layout [name]      a saved session as drawable geometry (JSON, for the panel)
 #   omasession resolve [--json]   which command each open window resolves to
 #   omasession install            timer, login restore, browser policy
@@ -527,6 +528,24 @@ cmd_layout() {
 
 cmd_list() {
     python3 "$LIB/history.py" list "$SESSION_DIR" "$@"
+}
+
+# ── delete ───────────────────────────────────────────────────────────────────
+# Removes a named session (or one history entry) with its previous copy. `last`
+# is the running autosave and is never deleted. The lock is the one save and
+# restore take for this name, so a delete never lands mid-save.
+cmd_delete() {
+    local name="${1:?usage: omasession delete <name>}"
+    case "$name" in
+        */*|.*) die "invalid session name '$name'" ;;
+        last|omasession.*|*.prev) die "'$name' cannot be deleted" ;;
+    esac
+    [[ -f "$SESSION_DIR/$name.toml" ]] || die "no saved session named '$name'"
+    exec 9>>"$SESSION_DIR/.$name.lock"
+    flock -w 10 9 || die "a save or restore of '$name' is running -- try again"
+    rm -f -- "$SESSION_DIR/$name.toml" "$SESSION_DIR/$name.titles.json" \
+             "$SESSION_DIR/$name.prev.toml" "$SESSION_DIR/$name.prev.titles.json"
+    say "deleted $name"
 }
 
 cmd_status() {
@@ -1054,7 +1073,7 @@ cmd_config() {
     esac
 }
 
-usage() { sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
     save)      shift; cmd_save "$@" ;;
@@ -1063,6 +1082,7 @@ case "${1:-}" in
     restore-app) shift; cmd_restore_app "$@" ;;
     status)    shift; cmd_status "$@" ;;
     list)      shift; cmd_list "$@" ;;
+    delete)    shift; cmd_delete "$@" ;;
     layout)    shift; cmd_layout "$@" ;;
     resolve)   shift; cmd_resolve "$@" ;;
     install)   shift; cmd_install "$@" ;;

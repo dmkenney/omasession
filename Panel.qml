@@ -177,6 +177,14 @@ Panel {
   property var layoutData: null        // layout <name>: monitors, workspaces, windows
   property string layoutWorkspace: ""
   property string savedMessage: ""
+  // Name whose Delete was clicked once; a second click within 4s deletes it.
+  property string pendingDelete: ""
+
+  Timer {
+    id: deleteConfirmTimer
+    interval: 4000
+    onTriggered: root.pendingDelete = ""
+  }
 
   function loadSessions() {
     if (mockMode || listProc.running) return
@@ -270,6 +278,18 @@ Panel {
       root.savedMessage = code === 0 ? "Restored \"" + restoreNamedProc.name + "\""
                                      : "Restore of \"" + restoreNamedProc.name + "\" finished with problems"
       root.refresh()
+    }
+  }
+
+  Process {
+    id: deleteProc
+    property string name: ""
+    command: [root.cliPath, "delete", name]
+    onExited: function(code) {
+      root.savedMessage = code === 0 ? "Deleted \"" + deleteProc.name + "\""
+                                     : "Could not delete \"" + deleteProc.name + "\""
+      root.pendingDelete = ""
+      root.loadSessions()
     }
   }
 
@@ -1224,10 +1244,12 @@ Panel {
 
               Repeater {
                 model: [
-                  { title: "Saved layouts", rows: root.sessions ? root.sessions.named : [], empty: "None yet. Name the current windows above." },
-                  { title: "History", rows: root.sessions ? root.sessions.history : [], empty: listProc.running ? "Loading…" : "Nothing yet." }
+                  { title: "Saved layouts", rows: root.sessions ? root.sessions.named : [], empty: "None yet. Name the current windows above.", deletable: true },
+                  { title: "History", rows: root.sessions ? root.sessions.history : [], empty: listProc.running ? "Loading…" : "Nothing yet.", deletable: false }
                 ]
                 Column {
+                  id: savedSection
+                  property bool deletable: modelData.deletable === true
                   width: savedView.width
                   spacing: Style.spacing.xs
                   Text {
@@ -1255,7 +1277,7 @@ Panel {
                       Column {
                         id: rowText
                         anchors.left: parent.left
-                        anchors.right: previewButton.left
+                        anchors.right: deleteButton.visible ? deleteButton.left : previewButton.left
                         anchors.leftMargin: Style.space(8)
                         anchors.rightMargin: Style.spacing.sm
                         anchors.verticalCenter: parent.verticalCenter
@@ -1276,6 +1298,28 @@ Panel {
                           color: root.dim
                           font.family: Style.font.family
                           font.pixelSize: Style.font.caption
+                        }
+                      }
+                      Button {
+                        id: deleteButton
+                        visible: savedSection.deletable
+                        anchors.right: previewButton.left
+                        anchors.rightMargin: Style.spacing.xs
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.pendingDelete === modelData.name ? "Confirm" : "Delete"
+                        bordered: true
+                        focusable: true
+                        enabled: !root.mockMode && !deleteProc.running && !restoreNamedProc.running
+                                 && !saveAsProc.running
+                        onClicked: {
+                          if (root.pendingDelete !== modelData.name) {
+                            root.pendingDelete = modelData.name
+                            deleteConfirmTimer.restart()
+                            return
+                          }
+                          deleteConfirmTimer.stop()
+                          deleteProc.name = modelData.name
+                          deleteProc.running = true
                         }
                       }
                       Button {

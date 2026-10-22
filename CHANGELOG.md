@@ -6,6 +6,9 @@ request.
 
 ## Unreleased
 
+- `omasession delete <name>` removes a named session or a history entry, and
+  the panel's Saved tab has a Delete button (click twice to confirm). `last`
+  cannot be deleted.
 - Windows that are never worth restoring are left out of saves: omasnap's
   screenshot preview and a nested Hyprland's window. Add more classes with
   `excludeClasses`. Before, a preview open during a save was relaunched at

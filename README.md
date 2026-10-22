@@ -190,6 +190,7 @@ Save any arrangement under a name of your own and bring it back later:
 $OMASESSION save work          # save the current windows as "work"
 $OMASESSION list               # named sessions and history, with ages
 $OMASESSION restore work       # or restore history-20261021-222219
+$OMASESSION delete work        # remove it (the panel's Saved tab has Delete too)
 ```
 
 ## Configure
