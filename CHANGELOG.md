@@ -8,6 +8,9 @@ request.
 
 - Saves leave out omasnap's screenshot preview and a nested Hyprland's window.
   Before, a preview open during a save was relaunched at login.
+- `omasession delete <name>` removes a named session or a history entry, and
+  the panel's Saved tab has a Delete button (click twice to confirm). `last`
+  cannot be deleted.
 
 ## 0.6.0 — 2026-11-02
 
